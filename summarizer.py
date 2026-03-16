@@ -7,7 +7,7 @@ class LLMSummarizer:
         if not self.use_mock:
             from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
             
-            model_id = "google/gemma-3-1b-it"
+            model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
             print(f"Loading {model_id}...")
             
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
