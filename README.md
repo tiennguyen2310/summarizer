@@ -1,15 +1,16 @@
-# 📧 AI Daily Email Summarizer
+# 📧 AI Daily Summarizer
 
-An open-source, locally run (or cloud GPU) AI tool that securely connects to the user's Gmail, extracts your daily newsletters/emails, and generates real-time concise summaries using **Qwen3-4B-Instruct**.
+An open-source, locally run (or cloud GPU) AI tool that extracts and summarizes data from multiple platforms. It securely connects to a user's Gmail via OAuth, and natively scrapes YouTube search results, generating real-time concise summaries using **Qwen3-4B-Instruct**.
 
 ## 🚀 Live Demonstration
 I have deployed the AI inference engine on a Kaggle T4 GPU. 
 👉 **[View the Kaggle Notebook Demo Here](https://www.kaggle.com/code/tien23/summarizer)**
 
-*(Note: For security reasons, the underlying OAuth tokens are kept in a private Kaggle dataset. You can view the code, but you must clone the repo and supply your own `credentials.json` to run it yourself).*
+*(Note: The **YouTube Search** feature is completely keyless and ready to use in the Kaggle demo instantly! However, for security reasons, the Email integration requires you to clone the repo and supply your own `credentials.json` to run it locally).*
 
 ## 🛠️ Features
 - **Secure OAuth 2.0 Login:** Does not use app passwords; uses official Google APIs.
+- **Keyless YouTube Extraction:** Integrates `yt-dlp` to natively query and scrape YouTube video metadata and descriptions without requiring API keys or triggering rate limits.
 - **Real-Time UI Yielding:** Built with Gradio to stream summaries live as they generate.
 - **Smart Text Cleaning:** Uses Regex to strip out messy HTML, image links, and tracking URLs to save LLM context space.
 - **Incomplete Sentence Heuristic:** Post-processes the LLM output to guarantee grammatically complete sentences.
@@ -26,4 +27,4 @@ I have deployed the AI inference engine on a Kaggle T4 GPU.
 - Support for additional open-source models (Mistral, Llama, etc.)
 - Multi-email batch summarization
 - Daily digest email delivery
-- Different sources ofsummarization (news, YouTube, etc.)
+- Official API integrations for LinkedIn and Twitter feeds
