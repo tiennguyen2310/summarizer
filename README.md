@@ -12,8 +12,7 @@ I have deployed the AI inference engine on a Kaggle T4 GPU.
 - **Secure OAuth 2.0 Login:** Does not use app passwords; uses official Google APIs.
 - **Keyless YouTube Extraction:** Integrates `yt-dlp` to natively query and scrape YouTube video metadata and descriptions without requiring API keys or triggering rate limits.
 - **Real-Time UI Yielding:** Built with Gradio to stream summaries live as they generate.
-- **Smart Text Cleaning:** Uses Regex to strip out messy HTML, image links, and tracking URLs to save LLM context space.
-- **Incomplete Sentence Heuristic:** Post-processes the LLM output to guarantee grammatically complete sentences.
+- **Dynamic Model Hot-Swapping:** Allows users to switch between different open-source LLMs (e.g., Qwen, DeepSeek, Mistral) live in the UI without restarting the application backend.
 
 ## 💻 How to run locally
 1. `git clone https://github.com/tiennguyen2310/summarizer`

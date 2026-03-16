@@ -58,10 +58,26 @@ def process_content(source, limit, query):
         html_output += card
         yield html_output + "</div>"
 
+def change_model_logic(new_model_id):
+    if USE_MOCK_LLM:
+        return "Using Mock LLM - No reload needed."
+    result = summarizer.load_model(new_model_id)
+    return result
+
 with gr.Blocks(theme=gr.themes.Base()) as interface:
     gr.Markdown("# 🌐 AI Summarizer")
     gr.Markdown("Instantly catch up on YouTube topics or your Inbox using completely local AI. *(Email integration requires local OAuth setup).*")
     
+    with gr.Accordion("⚙️ Model Settings", open=False):
+        with gr.Row():
+            model_input = gr.Textbox(
+                value="Qwen/Qwen2.5-1.5B-Instruct", 
+                label="Hugging Face Model ID",
+                placeholder="e.g., deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+            )
+            load_btn = gr.Button("Reload Model", variant="secondary")
+        status_msg = gr.Markdown("*Current model is loaded and ready.*")
+
     with gr.Row():
         source_dropdown = gr.Dropdown(
             choices=["YouTube Search", "Emails (Requires Auth Setup)", "LinkedIn (Demo)"], 
@@ -86,6 +102,9 @@ with gr.Blocks(theme=gr.themes.Base()) as interface:
 
     source_dropdown.change(fn=update_ui, inputs=source_dropdown, outputs=search_box)
     fetch_btn.click(fn=process_content, inputs=[source_dropdown, limit_slider, search_box], outputs=output_area)
+
+    # connect load button
+    load_btn.click(fn=change_model_logic, inputs=model_input, outputs=status_msg)
 
 if __name__ == "__main__":
     interface.launch(share=True)
