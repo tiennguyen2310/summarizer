@@ -7,7 +7,7 @@ class LLMSummarizer:
         if not self.use_mock:
             from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
             
-            model_id = "Qwen/Qwen3-4B-Instruct-2507"
+            model_id = "google/gemma-3-1b-it"
             print(f"Loading {model_id}...")
             
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -29,7 +29,7 @@ class LLMSummarizer:
             return f"[FAKE SUMMARY] This is a fake summary for local testing of: {text[:30]}..."
 
         # prompt = f"Summarize the following text in 1 or 2 clear sentences. Text: {text}\nSummary:"
-        prompt = f"Summarize the following email in exactly two clear, complete sentences.\n\nText: {text}\n\nSummary:"
+        prompt = f"Summarize the following text in exactly two clear, complete sentences.\n\nText: {text}\n\nSummary:"
         
         outputs = self.pipeline(prompt)
         raw_summary = outputs[0]["generated_text"].replace(prompt, "").strip()

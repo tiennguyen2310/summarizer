@@ -1,6 +1,6 @@
 # 📧 AI Daily Summarizer
 
-An open-source, locally run (or cloud GPU) AI tool that extracts and summarizes data from multiple platforms. It securely connects to a user's Gmail via OAuth, and natively scrapes YouTube search results, generating real-time concise summaries using **Qwen3-4B-Instruct**.
+An open-source, locally run (or cloud GPU) AI tool that extracts and summarizes data from multiple platforms. It securely connects to a user's Gmail via OAuth, and natively scrapes YouTube search results, generating real-time concise summaries using a Large Language Model.
 
 ## 🚀 Live Demonstration
 I have deployed the AI inference engine on a Kaggle T4 GPU. 
