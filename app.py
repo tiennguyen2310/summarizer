@@ -5,7 +5,7 @@ import os
 import html
 
 # true on server; false locally
-USE_MOCK_LLM = os.getenv("USE_MOCK_LLM", "True") == "True"
+USE_MOCK_LLM = os.getenv("USE_MOCK_LLM", "False") == "True"
 print("Initializing AI")
 summarizer = LLMSummarizer(use_mock=USE_MOCK_LLM)
 
@@ -58,25 +58,25 @@ def process_content(source, limit, query):
         html_output += card
         yield html_output + "</div>"
 
-def change_model_logic(new_model_id):
+def change_model_logic(new_model_path):
     if USE_MOCK_LLM:
         return "Using Mock LLM - No reload needed."
-    result = summarizer.load_model(new_model_id)
+    result = summarizer.load_model(new_model_path)
     return result
 
 with gr.Blocks(theme=gr.themes.Base()) as interface:
     gr.Markdown("# 🌐 AI Summarizer")
-    gr.Markdown("Instantly catch up on YouTube topics or your Inbox using completely local AI. *(Email integration requires local OAuth setup).*")
+    gr.Markdown("Instantly catch up on YouTube topics or your Inbox using llama.cpp and a local GGUF model. *(Email integration requires local OAuth setup).*")
     
     with gr.Accordion("⚙️ Model Settings", open=False):
         with gr.Row():
             model_input = gr.Textbox(
-                value="Qwen/Qwen2.5-1.5B-Instruct", 
-                label="Hugging Face Model ID",
-                placeholder="e.g., deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+                value=os.getenv("LLAMA_MODEL", "../ChatBot/Llama-3.2-1B-Instruct-Q4_K_M.gguf"),
+                label="GGUF Model Path",
+                placeholder="e.g., ../ChatBot/Llama-3.2-1B-Instruct-Q4_K_M.gguf"
             )
             load_btn = gr.Button("Reload Model", variant="secondary")
-        status_msg = gr.Markdown("*Current model is loaded and ready.*")
+        status_msg = gr.Markdown("*Current GGUF model path is ready.*")
 
     with gr.Row():
         source_dropdown = gr.Dropdown(
@@ -107,4 +107,4 @@ with gr.Blocks(theme=gr.themes.Base()) as interface:
     load_btn.click(fn=change_model_logic, inputs=model_input, outputs=status_msg)
 
 if __name__ == "__main__":
-    interface.launch(share=True)
+    interface.launch(share=os.getenv("GRADIO_SHARE", "False") == "True")
