@@ -1,154 +1,134 @@
 import os
-import re
-import shutil
-import subprocess
-from pathlib import Path
+from typing import Iterable
 
+import requests
+from dotenv import load_dotenv
+load_dotenv()
 
 class LLMSummarizer:
     def __init__(
         self,
-        model_path="../ChatBot/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+        model_path=None,
         use_mock=False,
-        llama_cli="../llama.cpp/build/bin/llama-cli",
+        llama_cli=None,
         max_tokens=160,
         ctx_size=4096,
         gpu_layers=0,
         timeout=180,
     ):
         self.use_mock = use_mock
-        self.llama_cli = self._resolve_path(os.getenv("LLAMA_CPP_CLI", llama_cli))
-        self.current_model_path = None
-        self.max_tokens = int(os.getenv("LLAMA_MAX_TOKENS", max_tokens))
-        self.ctx_size = int(os.getenv("LLAMA_CTX_SIZE", ctx_size))
-        self.gpu_layers = os.getenv("LLAMA_GPU_LAYERS", str(gpu_layers))
-        self.timeout = int(os.getenv("LLAMA_TIMEOUT", timeout))
-
-        if not self.use_mock:
-            self.load_model(os.getenv("LLAMA_MODEL", model_path))
-
-    def _resolve_path(self, value):
-        if not value:
-            return None
-
-        expanded = os.path.expanduser(value)
-        if os.path.isabs(expanded):
-            return expanded
-
-        project_root = Path(__file__).resolve().parent
-        return str((project_root / expanded).resolve())
+        self.max_tokens = int(os.getenv("OPENROUTER_MAX_TOKENS", max_tokens))
+        self.timeout = int(os.getenv("OPENROUTER_TIMEOUT", timeout))
+        self.temperature = float(os.getenv("OPENROUTER_TEMPERATURE", "0.2"))
+        self.api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+        self.model = os.getenv("OPENROUTER_MODEL", "~openai/gpt-latest")
+        self.api_url = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
+        self.site_url = os.getenv("OPENROUTER_SITE_URL", "http://localhost")
+        self.app_name = os.getenv("OPENROUTER_APP_NAME", "Summarizer")
+        self.current_model_path = self.model
 
     def load_model(self, model_path):
-        resolved_model = self._resolve_path(model_path)
+        if not model_path:
+            return "Error loading model: missing OpenRouter model slug."
 
-        if not resolved_model or not os.path.exists(resolved_model):
-            return f"Error loading model: GGUF file not found: {resolved_model or model_path}"
+        self.model = model_path.strip()
+        self.current_model_path = self.model
+        return f"Using OpenRouter model: {self.model}"
 
-        if not os.path.exists(self.llama_cli) and shutil.which(self.llama_cli) is None:
-            return f"Error loading model: llama-cli not found: {self.llama_cli}"
-
-        self.current_model_path = resolved_model
-        print(f"Using llama.cpp model: {resolved_model}")
-        return f"Using GGUF model: {resolved_model}"
-
-    def summarize(self, text):
+    def summarize(self, text, topic=None, style="item"):
         if self.use_mock:
-            return f"[FAKE SUMMARY] This is a fake summary for local testing of: {text[:30]}..."
+            return f"[FAKE SUMMARY] {text[:120]}"
 
-        if not self.current_model_path:
-            raise RuntimeError("No llama.cpp GGUF model is loaded.")
+        if not self.api_key:
+            return "OpenRouter API key missing. Set OPENROUTER_API_KEY or enable USE_MOCK_LLM."
 
-        system_prompt = (
-            "You are a concise summarizer. Return exactly two clear, complete "
-            "sentences and no preamble."
-        )
-        prompt = (
-            "Summarize the following content in exactly two clear, complete "
-            f"sentences.\n\nText:\n{text}\n\nSummary:"
-        )
+        prompt = self._build_item_prompt(text=text, topic=topic, style=style)
+        return self._chat(prompt, max_tokens=self.max_tokens)
 
-        cmd = [
-            self.llama_cli,
-            "-m",
-            self.current_model_path,
-            "-n",
-            str(self.max_tokens),
-            "-c",
-            str(self.ctx_size),
-            "-ngl",
-            str(self.gpu_layers),
-            "--temp",
-            "0.2",
-            "--top-p",
-            "0.9",
-            "--no-display-prompt",
-            "--no-show-timings",
-            "--log-disable",
-            "--simple-io",
-            "-st",
-            "-sys",
-            system_prompt,
-            "-p",
-            prompt,
-        ]
+    def summarize_collection(self, items: Iterable[dict], topic=None, cross_media=False):
+        if self.use_mock:
+            first = next(iter(items), {"body": ""})
+            return f"[FAKE COLLECTION SUMMARY] {str(first.get('body', ''))[:120]}"
+
+        if not self.api_key:
+            return "OpenRouter API key missing. Set OPENROUTER_API_KEY or enable USE_MOCK_LLM."
+
+        prompt = self._build_collection_prompt(list(items), topic=topic, cross_media=cross_media)
+        return self._chat(prompt, max_tokens=self.max_tokens)
+
+    def _chat(self, prompt, max_tokens):
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": self.site_url,
+            "X-OpenRouter-Title": self.app_name,
+        }
+        payload = {
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a concise, factual summarizer. Use only the provided text and do not add preambles.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
 
         try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                timeout=self.timeout,
-                check=False,
+            response = requests.post(self.api_url, headers=headers, json=payload, timeout=self.timeout)
+        except requests.RequestException as exc:
+            return f"OpenRouter request failed: {exc}"
+
+        if response.status_code >= 400:
+            return f"OpenRouter error {response.status_code}: {response.text.strip()}"
+
+        data = response.json()
+        choices = data.get("choices", [])
+        if not choices:
+            return "OpenRouter returned no completion."
+
+        message = choices[0].get("message", {})
+        content = message.get("content", "")
+        return self._clean_output(content)
+
+    def _build_item_prompt(self, text, topic=None, style="item"):
+        topic_line = f"Topic: {topic}" + chr(10) if topic else ""
+        return f"""{topic_line}Summarize this {style} in exactly 2 short sentences.
+Focus on the main facts only.
+
+Source text:
+{text}"""
+
+    def _build_collection_prompt(self, items, topic=None, cross_media=False):
+        topic_line = f"Topic: {topic}" + chr(10) if topic else ""
+        source_lines = []
+        for index, item in enumerate(items[:5], start=1):
+            subject = item.get("subject", f"Item {index}")
+            body = item.get("body", "")
+            source = item.get("source", "text")
+            content_type = item.get("content_type", "text")
+            source_lines.append(
+                f"[{index}] source={source} type={content_type} title={subject}" + chr(10) + body
             )
-        except subprocess.TimeoutExpired:
-            return "Summary generation timed out. Try a smaller input or increase LLAMA_TIMEOUT."
 
-        stdout = result.stdout.decode("utf-8", errors="replace")
-        stderr = result.stderr.decode("utf-8", errors="replace")
-
-        if result.returncode != 0:
-            error = (stderr or stdout).strip()
-            return f"llama.cpp failed: {error}"
-
-        raw_summary = self._extract_summary(stdout)
-
-        # Find the last punctuation mark, and cut everything after it.
-        match = re.search(r".*[.!?]", raw_summary, flags=re.DOTALL)
-        if match:
-            clean_summary = match.group(0)
-        else:
-            clean_summary = raw_summary + "."
-
-        return clean_summary
-
-    def _extract_summary(self, output):
-        summary = output
-        prompt_marker = "\n> "
-        if prompt_marker in summary:
-            summary = summary.rsplit(prompt_marker, 1)[-1]
-            if "\n\n" in summary:
-                summary = summary.split("\n\n", 1)[-1]
-
-        if "Summary:" in summary:
-            summary = summary.rsplit("Summary:", 1)[-1]
-
-        summary = re.sub(r"\s*Exiting\.*\s*$", "", summary).strip()
-        summary = re.sub(r"^Loading model\.\.\..*?\n\n", "", summary, flags=re.DOTALL).strip()
-
-        lines = []
-        ignored_prefixes = (
-            "warning:",
-            "build",
-            "model",
-            "modalities",
-            "available commands:",
-            "/",
+        media_hint = (
+            "Blend institutional facts from text/news with on-the-ground video transcript reactions."
+            if cross_media
+            else "Blend the sources into a single summary."
         )
-        for line in summary.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith(ignored_prefixes):
-                continue
-            if stripped.startswith(">"):
-                continue
-            lines.append(stripped)
 
-        return " ".join(lines).strip()
+        sources_block = (chr(10) + chr(10)).join(source_lines)
+        return f"""{topic_line}You are combining up to 5 source snippets into one cohesive summary.
+{media_hint}
+Write:
+1. One short headline sentence.
+2. Three bullets: facts, reactions, and what is still uncertain.
+Keep it grounded in the snippets below and do not invent details.
+
+{sources_block}"""
+
+    def _clean_output(self, text):
+        return " ".join((text or "").split())
+
